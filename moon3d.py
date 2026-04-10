@@ -393,7 +393,7 @@ def update_scene(plotter, mi, start_date, no_text=False):
 
 
 def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='moon_relief_06m_g.grd', 
-                 output_file='moon_animation.mp4', fps=10):
+                 output_file='../Figures/moon_animation.mp4', fps=10):
     """Create an animation of the Moon camera view over time with mesh rendered once.
     
     Parameters:
