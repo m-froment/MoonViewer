@@ -97,4 +97,4 @@ st.image("./moon_view.png")
 with open("./moon_view.html", "r") as f:
     html = f.read()
 
-st.components.v1.html(html, height=600, width=800)
+st.iframe(html, height=600, width=800)

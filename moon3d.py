@@ -11,6 +11,7 @@ import xarray as xr
 from scipy import interpolate
 import time as ptime 
 import ephem
+from PIL import Image
 
 # Set font to Helvetica or Arial
 # matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial']
@@ -138,33 +139,45 @@ def create_crater_circle(crater_lat, crater_lon,crater_radius_km, dem_path, num_
 
 
 def load_lunar_dem(dem_path='moon_relief_06m_g.grd', image_path="lroc_color_16bit_srgb_4k.tif",
-                   scale_factor=1,res = 800):
+                   scale_factor=1, res=800):
     """Load LOLA DEM and create a displaced PyVista sphere mesh.
     
     Parameters:
     - dem_path: path to the DEM file
+    - image_path: path to the texture image file (TIFF, PNG, JPG, etc.)
     - scale_factor: scale the elevation (LOLA is in meters, scale to km or appropriate units)
+    - res: resolution of the sphere mesh
     
     Returns:
     - pv.PolyData: the displaced sphere mesh
     """
     radius = 1737.4e3 
 
-    # tex = pv.read_texture(image_path)
-    # from PIL import Image
-    # im = Image.open(image_path)
-    # im.show()
-    # lon_im = np.linspace(-180,180,im.width)
-    # lat_im = np.linspace(-90,90,im.height)
-    # interp = interpolate.RegularGridInterpolator((lon_im, lat_im), dem_data.T,
-    #                                              method="linear")
+    # Load texture image using PIL (more robust than PyVista's TIFF reader)
+    tex_img = Image.open(image_path)
+    # Convert to RGB if needed (remove alpha channel)
+    if tex_img.mode == 'RGBA':
+        tex_img = tex_img.convert('RGB')
+    elif tex_img.mode not in ['RGB', 'L']:
+        tex_img = tex_img.convert('RGB')
+    
+    # Convert PIL image to numpy array
+    tex_array = np.array(tex_img)
+    tex_array = np.transpose(tex_array, (1, 0, 2))
+
+    ### Load lon, lat 
+    lon_im = np.linspace(-180,180,tex_img.width)
+    lat_im = np.linspace(90,-90,tex_img.height)
+
+    interp_im = interpolate.RegularGridInterpolator((lon_im, lat_im), tex_array,
+                                                 method="linear")
 
     ### Load GRD file using xarray
     ds = xr.open_dataset(dem_path)
     dem_data = ds['z'].values  
     lat = ds['lat'].values
     lon = ds['lon'].values
-    ### Artificially removes elevation
+    ### Artificially removes elevation for tests 
     # dem_data*=0
 
     ### Create interpolator for DEM
@@ -193,8 +206,15 @@ def load_lunar_dem(dem_path='moon_relief_06m_g.grd', image_path="lroc_color_16bi
         
     sphere.points = points
     sphere['elevation'] = elevations
+
+    interp_tex = interp_im((lon_p, lat_p))
+    interp_tex = np.clip(interp_tex, 0, 255)
+    interp_tex = interp_tex.astype(np.uint8)
+    sphere['moon_texture'] = interp_tex
+
     sphere['shading'] = np.zeros(len(elevations))
     sphere.compute_normals(cell_normals=False, inplace=True)
+
 
     return sphere
 
@@ -267,8 +287,10 @@ def make_3d_image(dem_path='moon_relief_06m_g.grd'):
     ### Render the mesh 
     plotter.add_mesh(
         dem_mesh,
-        scalars='elevation',
-        cmap='gray', clim=[-5000,1000],
+        # scalars='elevation',
+        # cmap='gray', clim=[-5000,1000],
+        scalars='moon_texture',
+        rgb=True,
         lighting=True,
         scalar_bar_args={
             'position_x': 0.05,
@@ -519,7 +541,7 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     plotter.off_screen = True
     update_scene(plotter, mi, date, no_text=True)
     # plotter.show(auto_close=False)
-    plotter.export_html("moon_view.html")
+    # plotter.export_html("moon_view.html")
     # plotter.show(screenshot='./moon_view.png')  
     plotter.screenshot('./moon_view.png')
     plotter.close()
@@ -537,7 +559,7 @@ if __name__ == '__main__':
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
 
     ### Input observer time in UTC. 
-    start_date=(2026, 5, 23, 11, 12, 0)
+    start_date=(2026, 5, 1, 11, 12, 0)
     current = datetime(*start_date)
     mi.update(start_date)
     ##################################################################################
@@ -561,7 +583,7 @@ if __name__ == '__main__':
     plotter = make_3d_image()
     update_scene(plotter, mi, current)
     plotter.show(auto_close=False)
-    plotter.export_html("moon_view.html")
+    # plotter.export_html("moon_view.html")
     plotter.screenshot('moon_view.png')  
 
     ### Option 2: Live interactive animation (updates every 1 second)
