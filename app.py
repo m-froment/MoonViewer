@@ -2,12 +2,13 @@
 Moon Viewer: Shape of the Moon with date and time from an observer
 """
 import streamlit as st
-import pandas as pd
-from typing import List, Dict
-from pathlib import Path
-import re
 
-# from moon3d 
+### To use stpyvista
+# import multiprocessing as mp
+# mp.set_start_method("fork", force=True)
+
+# from moon3d
+import pylunar  
 import moon3d
 
 ### Page configuration
@@ -27,13 +28,17 @@ st.title("Visibility of the Moon")
 
 
 # plot_tab, doc_tab = st.tabs(["📈 tab1", "📖 tab2"])
-
-datetime = st.datetime_input(label="Date and time of observation (UTC)",
-              value="now",
-              format="DD/MM/YYYY",
-              width=220,
-              )
-
+col_date, col_phase = st.columns(2, width=800)
+with col_date:
+    datetime = st.datetime_input(label="Date and time of observation (UTC)",
+                value="now",
+                format="DD/MM/YYYY",
+                width=220,
+                )
+with col_phase:
+    mi = pylunar.MoonInfo((0,0,0), (0,0,0))
+    mi.update(datetime)
+    st.markdown("##### Phase: {0}".format(mi.phase_name()))
 
 ### Content 
 st.header("Position of the Moon")
@@ -61,13 +66,14 @@ with col1:
         "Select observer location:",
         options=list(preset_locations.keys()),
         index=0,  # Default to Calern Observatory
-        key="location_preset"
+        key="location_preset",
+        width=300,
     )
 
 # Handle location selection
 if selected_preset == "Custom Location":
     st.markdown("Enter your custom location:")
-    col_lat_d, col_lat_m, col_lat_s = st.columns(3)
+    col_lat_d, col_lat_m, col_lat_s = st.columns(3, width=800)
     with col_lat_d:
         lat_deg = st.number_input("Latitude (degrees)", value=43, key="lat_deg", step=1)
     with col_lat_m:
@@ -77,7 +83,7 @@ if selected_preset == "Custom Location":
     
     observer_lat = (lat_deg, lat_min, lat_sec)
     
-    col_lon_d, col_lon_m, col_lon_s = st.columns(3)
+    col_lon_d, col_lon_m, col_lon_s = st.columns(3, width=800)
     with col_lon_d:
         lon_deg = st.number_input("Longitude (degrees)", value=6, key="lon_deg", step=1)
     with col_lon_m:
@@ -91,10 +97,14 @@ else:
 
 ### Generate image
 plotter = moon3d.make_3d_image()
-moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
-st.image("./moon_view.png")
+plotter = moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
+st.markdown("Still frame")
+st.image("./moon_view.png", width=800)
 
-with open("./moon_view.html", "r") as f:
-    html = f.read()
+st.markdown("Interactive 3D window (scroll to zoom, click to rotate, shift+click to pan)")
+st.iframe("moon_view.html", height=600, width=800)
 
-st.iframe(html, height=600, width=800)
+### Attempt at using stpyvista to render vtk window in streamlit
+### Unfortunately, the camera zoom stil doesn't work 
+# from stpyvista import stpyvista
+# stpyvista(plotter, width=800, horizontal_align='left')

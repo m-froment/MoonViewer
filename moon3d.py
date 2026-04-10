@@ -394,8 +394,9 @@ def update_scene(plotter, mi, start_date, no_text=False):
     ### Try for an infinite focal (telescope)
     # plotter.camera.focal_point = -moon_view_dir*1e10 #(0.0, 0.0, 0.0)
     plotter.camera.up = (0.0, 0.0, 1.0)
-    plotter.camera.zoom(50)
     plotter.enable_parallel_projection()
+    plotter.camera.zoom(50)
+    # plotter.camera.parallel_scale *= 0.02  ### same as zoom *50 
     ### NOTE: Do not modify camera distance, but zoom instead. 
     ###       Otherwise it changes the focal.  
     ### enable parallel projection can also help remove perspective
@@ -406,7 +407,7 @@ def update_scene(plotter, mi, start_date, no_text=False):
             plotter.remove_actor(plotter.actors["date_text"])
         
         plotter.add_text(
-            f"Date UTC: {start_date.strftime("%Y-%m-%d %H:%M")}\nPhase: {mi.phase_name()}",
+            "Date UTC: {0}\nPhase: {1}".format(start_date.strftime("%Y-%m-%d %H:%M"), mi.phase_name()),
             font_size=12,
             color="black",
             name="date_text",
@@ -545,6 +546,7 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     # plotter.show(screenshot='./moon_view.png')  
     plotter.screenshot('./moon_view.png')
     plotter.close()
+    return(plotter)
 
 
 ##################################################################################
@@ -583,7 +585,7 @@ if __name__ == '__main__':
     plotter = make_3d_image()
     update_scene(plotter, mi, current)
     plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")
+    plotter.export_html("moon_view.html")
     plotter.screenshot('moon_view.png')  
 
     ### Option 2: Live interactive animation (updates every 1 second)
