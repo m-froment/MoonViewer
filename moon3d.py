@@ -138,7 +138,7 @@ def create_crater_circle(crater_lat, crater_lon,crater_radius_km, dem_path, num_
 
 
 def load_lunar_dem(dem_path='moon_relief_06m_g.grd', image_path="lroc_color_16bit_srgb_4k.tif",
-                   scale_factor=1,res = 1000):
+                   scale_factor=1,res = 800):
     """Load LOLA DEM and create a displaced PyVista sphere mesh.
     
     Parameters:
@@ -519,7 +519,7 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     plotter.off_screen = True
     update_scene(plotter, mi, date, no_text=True)
     # plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")
+    plotter.export_html("moon_view.html")
     # plotter.show(screenshot='./moon_view.png')  
     plotter.screenshot('./moon_view.png')
     plotter.close()
@@ -561,7 +561,7 @@ if __name__ == '__main__':
     plotter = make_3d_image()
     update_scene(plotter, mi, current)
     plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")
+    plotter.export_html("moon_view.html")
     plotter.screenshot('moon_view.png')  
 
     ### Option 2: Live interactive animation (updates every 1 second)
