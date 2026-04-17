@@ -233,6 +233,7 @@ def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_h
     earth_moon_distances = []
     libration_lat = []
     libration_lon = []
+    subsolar_colon = []
 
     for _ in range(int(days * 24/step_hours)):
         mi_test.update((current.year, current.month, current.day,
@@ -243,10 +244,11 @@ def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_h
         earth_moon_distances.append(mi_test.earth_distance())
         libration_lat.append(mi_test.libration_lat())
         libration_lon.append(mi_test.libration_lon())
+        subsolar_colon.append(mi_test.colong())
         current += timedelta(hours=step_hours)
         
     #######################################
-    fig, (ax1, ax2) = plt.subplots(2,1)
+    fig, (ax1, ax2,ax3) = plt.subplots(3,1)
     ax1.fill_between(date_list, visibility, linestyle="-", color="orangered", alpha=0.3)
     ax2.plot(date_list, earth_moon_distances, c="k")
     ax2b = ax2.twinx()
@@ -266,6 +268,10 @@ def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_h
     ###
     ax2.set_ylabel("Earth-Moon distance [km]")
     ax2b.set_ylabel("Libration latitude/longitude [°]", color="b")
+    ###
+    ax3.plot(date_list, subsolar_colon, c="r", label="morning")
+    ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
+
     # ax.grid(True)
     fig.tight_layout()
 
@@ -292,6 +298,10 @@ def make_3d_image(dem_path='moon_relief_06m_g.grd'):
         scalars='moon_texture',
         rgb=True,
         lighting=True,
+        diffuse=1.0, 
+        specular = 0.0, 
+        ambient = 0.1,   ### Adds a little bit of ambient light in the Lunar shadow, 
+                         ### As if liten by the Earth reflected light. 
         scalar_bar_args={
             'position_x': 0.05,
             'position_y': 0.4,
@@ -324,7 +334,7 @@ def make_3d_image(dem_path='moon_relief_06m_g.grd'):
     return(plotter)
 
 
-def update_scene(plotter, mi, start_date, no_text=False):
+def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
     ### lunar illumination
     ### subsolar_lat: the latitude facing the sun. 
     ### Selenographic colongitude: the longitude of morning terminator
@@ -334,7 +344,12 @@ def update_scene(plotter, mi, start_date, no_text=False):
     ### /!\ in pylunar, longitude = -colongitude !  
     ### The sun (midday) is simply at colongitude - 90° 
     subsolar_lat = np.deg2rad(mi.subsolar_lat())
-    subsolar_lon = np.deg2rad(mi.colong() - 90)
+    subsolar_lon = -np.deg2rad(mi.colong() - 90)
+
+    ### To check 
+    # print("Subsolar point")
+    # print(np.rad2deg(subsolar_lat), "N")
+    # print(np.rad2deg(subsolar_lon), "E")
     
     sun_dir = np.array([
         np.cos(subsolar_lat) * np.cos(subsolar_lon),
@@ -371,7 +386,16 @@ def update_scene(plotter, mi, start_date, no_text=False):
         np.cos(libra_lat) * np.sin(libra_lon),
         np.sin(libra_lat),
     ])
+    ### To check 
+    # print("Sub-Earth point")
+    # print(np.rad2deg(libra_lat), "N")
+    # print(np.rad2deg(libra_lon), "E")
+
     moon_view_dir *= earth_moon_distance
+
+    ### To check 
+    # print("Distance")
+    # print(earth_moon_distance/1e3)
 
     ### Render the scene 
     if len(plotter.renderer.lights)>0:
@@ -381,10 +405,11 @@ def update_scene(plotter, mi, start_date, no_text=False):
     else: 
         ### No light exists: create it. 
         light = pv.Light(
-            position=sun_dir,   
-            focal_point=(0.0, 0.0, 0.0),
+            position=sun_dir,             ### Point the light is coming from
+            focal_point=(0.0, 0.0, 0.0),  ### point where the light is aiming 
             color=(1.0, 1.0, 0.95),
             intensity=1,
+            positional=False,             ### Ensure light is at +infty
         )
         # plotter.enable_shadows()   ### keep for future 
         plotter.add_light(light)
@@ -394,6 +419,8 @@ def update_scene(plotter, mi, start_date, no_text=False):
     ### Try for an infinite focal (telescope)
     # plotter.camera.focal_point = -moon_view_dir*1e10 #(0.0, 0.0, 0.0)
     plotter.camera.up = (0.0, 0.0, 1.0)
+    ### Option two: up is according to the observer position: need Earth ecliptic. 
+    # plotter.camera.up = (0.0, np.cos(np.deg2rad(lat_obs+...)), np.sin(np.deg2rad(lat_obs+...)) )
     plotter.enable_parallel_projection()
     plotter.camera.zoom(50)
     # plotter.camera.parallel_scale *= 0.02  ### same as zoom *50 
@@ -471,7 +498,7 @@ def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='moon_relief_0
     print(f"Animation saved to: {output_file}")
 
 
-def interactive_animation(mi, start_date, duration_days=30, step_hours=6, dem_path='moon_relief_06m_g.grd', 
+def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=6, dem_path='moon_relief_06m_g.grd', 
                           update_interval=1.0):
     """Display live animation in an interactive window that updates in real-time.
     
@@ -513,7 +540,7 @@ def interactive_animation(mi, start_date, duration_days=30, step_hours=6, dem_pa
             
             # Update scene (this removes old text and adds new one)
             plotter.remove_actor('text')
-            update_scene(plotter, mi, current)
+            update_scene(plotter, mi, current, lat_obs)
             if update_count ==0 :
                 print("Opening window... (Press Ctrl+C in terminal to stop)")
                 plotter.show(auto_close=False, full_screen=False)
@@ -536,11 +563,12 @@ def interactive_animation(mi, start_date, duration_days=30, step_hours=6, dem_pa
 
 
 def get_scene_png(plotter, observer_lat, observer_lon, date):
+    lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
     mi.update(date)
 
     plotter.off_screen = True
-    update_scene(plotter, mi, date, no_text=True)
+    update_scene(plotter, mi, date, lat_obs, no_text=True)
     # plotter.show(auto_close=False)
     # plotter.export_html("moon_view.html")
     # plotter.show(screenshot='./moon_view.png')  
@@ -561,7 +589,7 @@ if __name__ == '__main__':
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
 
     ### Input observer time in UTC. 
-    start_date=(2026, 5, 1, 11, 12, 0)
+    start_date=(2026, 4, 23, 14, 00, 0)
     current = datetime(*start_date)
     mi.update(start_date)
     ##################################################################################
@@ -578,24 +606,25 @@ if __name__ == '__main__':
     print(">>> Is Shackleton visible? {}\n".format(mi.is_visible(shackleton)))
 
     ### Test the visibility 
-    # test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_hours=2)
+    test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_hours=2)
     # plt.show()
 
     ### Option 1: Show single static frame
     plotter = make_3d_image()
-    update_scene(plotter, mi, current)
+    update_scene(plotter, mi, start_date, lat_obs, current)
     plotter.show(auto_close=False)
-    plotter.export_html("moon_view.html")
-    plotter.screenshot('moon_view.png')  
+    # plotter.export_html("moon_view.html")
+    # plotter.screenshot('moon_view.png')  
 
     ### Option 2: Live interactive animation (updates every 1 second)
     # interactive_animation(
     #     mi=mi,
     #     start_date=start_date,
+    #     lat_obs=lat_obs, 
     #     duration_days=28,
-    #     step_hours=6,  # Update every 6 hours
+    #     step_hours=24,  # Update every 6 hours
     #     dem_path='moon_relief_06m_g.grd',
-    #     update_interval=0.2  # Update displayed frame every 1 second
+    #     update_interval=2  # Update displayed frame every 1 second
     # )
 
     ### Option 3: Create animation video file (non-interactive)
