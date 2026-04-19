@@ -12,7 +12,8 @@ from scipy import interpolate
 import time as ptime 
 import ephem
 from PIL import Image
-
+import sys
+import gc
 # Set font to Helvetica or Arial
 # matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial']
 # matplotlib.rcParams['font.family'] = 'sans-serif'
@@ -46,97 +47,7 @@ def load_features():
 
     ### Add Shackleton manually to the in-memory feature container
     lc.features[id(shackleton)] = shackleton
-
     return(shackleton, lc)
-
-
-def create_crater_circle(crater_lat, crater_lon,crater_radius_km, dem_path, num_points=360):
-    """Create a circle around a crater that follows the local relief.
-    
-    Parameters:
-    - crater_lat: latitude of crater center (degrees)
-    - crater_lon: longitude of crater center (degrees)
-    - crater_radius_km: radius of the crater in kilometers
-    - dem_path: path to the DEM file
-    - num_points: number of points to define the circle
-    
-    Returns:
-    - pv.Line: a PyVista line object representing the circle
-    """
-    radius = 1737.4e3  # Moon radius in meters
-    crater_radius_m = crater_radius_km * 1e3
-    
-    # Load DEM for elevation sampling
-    ds = xr.open_dataset(dem_path)
-    dem_data = ds['z'].values
-    lat = ds['lat'].values
-    lon = ds['lon'].values
-    interp = interpolate.RegularGridInterpolator((lon, lat), dem_data.T, method="linear")
-    
-    # Convert crater center to radians
-    lat_c_rad = np.deg2rad(crater_lat)
-    lon_c_rad = np.deg2rad(crater_lon)
-    
-    # Convert crater center to Cartesian
-    x_c = radius * np.cos(lat_c_rad) * np.cos(lon_c_rad)
-    y_c = radius * np.cos(lat_c_rad) * np.sin(lon_c_rad)
-    z_c = radius * np.sin(lat_c_rad)
-    crater_center = np.array([x_c, y_c, z_c])
-    
-    # Create local coordinate system at crater center
-    # North direction (tangent to meridian)
-    north = np.array([
-        -np.sin(lat_c_rad) * np.cos(lon_c_rad),
-        -np.sin(lat_c_rad) * np.sin(lon_c_rad),
-        np.cos(lat_c_rad)
-    ])
-    
-    # East direction (tangent to parallel)
-    east = np.array([
-        -np.sin(lon_c_rad),
-        np.cos(lon_c_rad),
-        0
-    ])
-    
-    # Generate circle points
-    circle_points = []
-    angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
-    
-    for angle in angles:
-        # Point on circle in local tangent plane
-        local_x = crater_radius_m * np.cos(angle)
-        local_y = crater_radius_m * np.sin(angle)
-        
-        # Convert to tangent plane coordinates (using east and north)
-        point_3d = crater_center + local_x * east + local_y * north
-        
-        # Normalize and project back to sphere surface
-        point_3d_norm = point_3d / np.linalg.norm(point_3d) * radius
-        
-        # Get lat/lon of this point
-        r_p = np.linalg.norm(point_3d_norm)
-        lat_p = np.rad2deg(np.arcsin(point_3d_norm[2] / r_p))
-        lon_p = np.rad2deg(np.arctan2(point_3d_norm[1], point_3d_norm[0]))
-        
-        # Sample DEM for elevation
-        try:
-            elevation = interp((lon_p, lat_p)) *  2
-        except:
-            elevation = 0
-        
-        # Displace point outward by elevation
-        point_final = point_3d_norm / np.linalg.norm(point_3d_norm) * (radius + elevation)
-        circle_points.append(point_final)
-    
-    # Close the circle by adding the first point again
-    circle_points.append(circle_points[0])
-    circle_points = np.array(circle_points)
-    
-    # Create PyVista line
-    circle_line = pv.Spline(circle_points, n_points=len(circle_points))
-    
-    return circle_line
-
 
 def load_lunar_dem(dem_path='moon_relief_06m_g.grd', image_path="lroc_color_16bit_srgb_4k.tif",
                    scale_factor=1, res=800):
@@ -211,79 +122,15 @@ def load_lunar_dem(dem_path='moon_relief_06m_g.grd', image_path="lroc_color_16bi
     interp_tex = np.clip(interp_tex, 0, 255)
     interp_tex = interp_tex.astype(np.uint8)
     sphere['moon_texture'] = interp_tex
-
     sphere['shading'] = np.zeros(len(elevations))
     sphere.compute_normals(cell_normals=False, inplace=True)
-
-
     return sphere
 
 
-def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_hours=1):
-    """Test Shackleton visibility for a series of dates starting at start_date.
-
-    Returns a list of 0/1 values for the next `days` days.
-    """
-
-    mi_test = pylunar.MoonInfo(observer_lat, observer_lon)
-
-    current = datetime(*start_date)
-    visibility = []
-    date_list = []
-    earth_moon_distances = []
-    libration_lat = []
-    libration_lon = []
-    subsolar_colon = []
-
-    for _ in range(int(days * 24/step_hours)):
-        mi_test.update((current.year, current.month, current.day,
-                        current.hour, current.minute, current.second))
-        visible = mi_test.is_visible(shackleton)
-        visibility.append(1 if visible else 0)
-        date_list.append(current)
-        earth_moon_distances.append(mi_test.earth_distance())
-        libration_lat.append(mi_test.libration_lat())
-        libration_lon.append(mi_test.libration_lon())
-        subsolar_colon.append(mi_test.colong())
-        current += timedelta(hours=step_hours)
-        
-    #######################################
-    fig, (ax1, ax2,ax3) = plt.subplots(3,1)
-    ax1.fill_between(date_list, visibility, linestyle="-", color="orangered", alpha=0.3)
-    ax2.plot(date_list, earth_moon_distances, c="k")
-    ax2b = ax2.twinx()
-    ax2b.plot(date_list, libration_lat, c="b", label="Lat")
-    ax2b.plot(date_list, libration_lon, c="r", label="Lon")
-    ###
-    ax1.set_title("Shackleton visibility over {} days".format(days))
-    ax2.set_xlabel("Days since {}".format(datetime(*start_date).strftime("%d/%m/%Y")))
-    ax1.set_ylabel("Visible (1) / Not visible (0)")
-    # ax.set_yticks([0, 1])
-    #ax.set_ylim(-0.1, 1.1)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-    ax1.tick_params(axis='x', labelrotation=45)
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-    ax2.tick_params(axis='x', labelrotation=45)
-    ax2b.legend()
-    ###
-    ax2.set_ylabel("Earth-Moon distance [km]")
-    ax2b.set_ylabel("Libration latitude/longitude [°]", color="b")
-    ###
-    ax3.plot(date_list, subsolar_colon, c="r", label="morning")
-    ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-
-    # ax.grid(True)
-    fig.tight_layout()
-
-    return visibility
-
-
-def make_3d_image(dem_path='moon_relief_06m_g.grd'):
-
+def make_3d_image():
     plotter = pv.Plotter(lighting=None)
-
     ### Load DEM
-    dem_mesh = load_lunar_dem(dem_path)
+    dem_mesh=load_lunar_dem('moon_relief_06m_g.grd')
     # dem_mesh.compute_normals(cell_normals=False, inplace=True)
     # normals = dem_mesh.point_data["Normals"]
     # illumination = np.clip(np.dot(normals, sun_dir), 0.0, 1.0)
@@ -307,30 +154,20 @@ def make_3d_image(dem_path='moon_relief_06m_g.grd'):
             'position_y': 0.4,
             'width': 0.08,
             'height': 0.5,
-            'title': 'Elevation (m)',
+            'title': 'Elevation (m)', 
             # 'title_font_size': 10,
             # 'label_font_size': 8,
             'vertical':True,
             'fmt':'% .4g',
         },
         # smooth_shading=True,  ### Should be off otherwise relief not visible
-    )
-
-    ### Add crater circle for Shackleton
-    crater_circle = create_crater_circle(
-        crater_lat=-89.67,
-        crater_lon=129.78,
-        crater_radius_km=10.5,  # diameter 21 km / 2
-        dem_path=dem_path,
-        num_points=360
-    )
-    plotter.add_mesh(
-        crater_circle,
-        color='gold',
-        line_width=4,
-        lighting=False,
-        render_lines_as_tubes=True
-    )
+    )    # plotter.add_mesh(
+    #     crater_circle,
+    #     color='gold',
+    #     line_width=4,
+    #     lighting=False,
+    #     render_lines_as_tubes=True
+    # )
     return(plotter)
 
 
@@ -439,8 +276,8 @@ def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
             color="black",
             name="date_text",
         )
-    plotter.set_background('slategray', top="lightsteelblue")
-
+    # plotter.set_background('slategray', top="lightsteelblue")
+    plotter.set_background((0.059, 0.067, 0.086))  # ou toute autre couleur
 
 def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='moon_relief_06m_g.grd', 
                  output_file='../Figures/moon_animation.mp4', fps=10):
@@ -498,80 +335,12 @@ def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='moon_relief_0
     print(f"Animation saved to: {output_file}")
 
 
-def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=6, dem_path='moon_relief_06m_g.grd', 
-                          update_interval=1.0):
-    """Display live animation in an interactive window that updates in real-time.
-    
-    Parameters:
-    - mi: pylunar.MoonInfo object
-    - start_date: tuple (year, month, day, hour, minute, second) or datetime object
-    - duration_days: number of days to animate
-    - step_hours: hours between updates
-    - dem_path: path to DEM file
-    - update_interval: seconds between screen updates (default 1.0)
-    
-    The window will update every update_interval seconds and you can close it manually.
-    """
-    import time
-    
-    if isinstance(start_date, tuple):
-        current = datetime(*start_date)
-    else:
-        current = start_date
-    
-    # Create plotter with mesh (only once)
-    print("Creating interactive scene...")
-    plotter = make_3d_image(dem_path=dem_path)
-    
-    # Calculate total updates
-    total_updates = int(duration_days * 24 / step_hours)
-    
-    # Keep updating while window is still open
-    update_count = 0
-    try:
-        while update_count < total_updates:
-            # Check if window is still open
-            # if not plotter.iren or plotter.iren.GetRenderWindow().GetNeverRendered():
-            #     break
-            
-            # Update MoonInfo
-            mi.update((current.year, current.month, current.day,
-                       current.hour, current.minute, current.second))
-            
-            # Update scene (this removes old text and adds new one)
-            plotter.remove_actor('text')
-            update_scene(plotter, mi, current, lat_obs)
-            if update_count ==0 :
-                print("Opening window... (Press Ctrl+C in terminal to stop)")
-                plotter.show(auto_close=False, full_screen=False)
-            
-            # Render the scene
-            plotter.render()
-            
-            # Progress
-            print(f"  Frame {update_count + 1}/{total_updates}: {current.strftime('%Y-%m-%d %H:%M')}")
-            
-            # Increment time
-            current += timedelta(hours=step_hours)
-            update_count += 1
-            
-            # Wait before next update
-            time.sleep(update_interval)
-            
-    except KeyboardInterrupt:
-        print("Animation stopped by user")
-
-
 def get_scene_png(plotter, observer_lat, observer_lon, date):
     lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
     mi.update(date)
-
     plotter.off_screen = True
     update_scene(plotter, mi, date, lat_obs, no_text=True)
-    # plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")
-    # plotter.show(screenshot='./moon_view.png')  
     plotter.screenshot('./moon_view.png')
     plotter.close()
     return(plotter)
@@ -583,69 +352,35 @@ if __name__ == '__main__':
     ### Input observer position (latitude degree-minutes-seconds), (longitude degree-minutes-seconds)
     ### Calern : 43° 44' 33" N / 6° 54' 01" E
     # observer_lat = (43, 44, 33)
-    observer_lat = (90, 0, 0)  ### North pole
+    observer_lat = (43, 44, 33)  ### North pole
     observer_lon = (6, 54, 1)
     lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
-
-    ### Input observer time in UTC. 
-    start_date=(2026, 4, 23, 14, 00, 0)
+    
+    start_date=(2025, 1, 1, 1, 0, 0)
     current = datetime(*start_date)
-    mi.update(start_date)
-    ##################################################################################
-
-    ### print fractional phase (1=full light)
-    fp = mi.fractional_phase()
-    print("Fractional phase: {:.3f}".format(fp))
-
-    ### Print phase name
-    pn = mi.phase_name()
-    print("Phase name: {}".format(pn))
-
-    shackleton, lc = load_features()
-    print(">>> Is Shackleton visible? {}\n".format(mi.is_visible(shackleton)))
-
-    ### Test the visibility 
-    test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_hours=2)
-    # plt.show()
-
-    ### Option 1: Show single static frame
-    plotter = make_3d_image()
-    update_scene(plotter, mi, start_date, lat_obs, current)
-    plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")
-    # plotter.screenshot('moon_view.png')  
-
-    ### Option 2: Live interactive animation (updates every 1 second)
-    # interactive_animation(
-    #     mi=mi,
-    #     start_date=start_date,
-    #     lat_obs=lat_obs, 
-    #     duration_days=28,
-    #     step_hours=24,  # Update every 6 hours
-    #     dem_path='moon_relief_06m_g.grd',
-    #     update_interval=2  # Update displayed frame every 1 second
-    # )
-
-    ### Option 3: Create animation video file (non-interactive)
-    # animate_moon(
-    #     mi=mi,
-    #     start_date=(2026, 4, 12, 2, 0, 0),
-    #     days=30,
-    #     step_hours=6,
-    #     dem_path='moon_relief_06m_g.grd',
-    #     output_file='moon_animation_30days.mp4',
-    #     fps=15
-    # )
-
-
-    ### Option 2: Create animation (uncomment to use)
-    # animate_moon(
-    #     mi=mi,
-    #     start_date=(2026, 4, 12, 2, 0, 0),
-    #     days=30,
-    #     step_hours=6,  # Frame every 6 hours
-    #     dem_path='moon_relief_06m_g.grd',
-    #     output_file='moon_animation_30days.mp4',
-    #     fps=15
-    # )
+    end_date=(2031, 12, 31, 23, 59, 59)
+    end_date = datetime(*end_date)
+    t_delta=3 #hours
+    
+    while current<end_date:
+    ### Input observer time in UTC. 
+        mi.update(current)
+        #################################################################################
+        # print(current.timetuple().tm_yday)
+        frame = ((current.timetuple().tm_yday-1) * 24 + current.hour)
+        ### Option 1: Show single static frame
+        plotter = make_3d_image()
+        update_scene(plotter, mi, start_date, lat_obs, current)
+        plotter.off_screen = True
+        name="images_moon/moon_view_"+str(current.year)+"_"+str(frame)+".png"
+        print(name)
+        plotter.show(screenshot=name)
+        
+        plotter.close()
+        del plotter
+        gc.collect()
+    
+        current+=timedelta(hours=t_delta)
+        
+        
