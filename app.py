@@ -10,6 +10,10 @@ import streamlit as st
 # from moon3d
 import pylunar  
 import moon3d
+# from stpyvista import stpyvista
+# import pyvista as pv 
+# import multiprocessing as mp
+# mp.set_start_method(method="fork", force=True)  # "spawn" works fine
 
 ### Page configuration
 st.set_page_config(
@@ -106,5 +110,4 @@ st.iframe("moon_view.html", height=600, width=800)
 
 ### Attempt at using stpyvista to render vtk window in streamlit
 ### Unfortunately, the camera zoom stil doesn't work 
-# from stpyvista import stpyvista
-# stpyvista(plotter, width=800, horizontal_align='left')
+# stpyvista(plotter, width=800)

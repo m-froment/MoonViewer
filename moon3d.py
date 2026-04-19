@@ -12,6 +12,8 @@ from scipy import interpolate
 import time as ptime 
 import ephem
 from PIL import Image
+# import multiprocessing as mp
+# mp.set_start_method(method="fork", force=True)  # "spawn" works fine
 
 # Set font to Helvetica or Arial
 # matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial']
@@ -278,9 +280,9 @@ def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_h
     return visibility
 
 
-def make_3d_image(dem_path='moon_relief_06m_g.grd'):
+def make_3d_image(dem_path='moon_relief_06m_g.grd', window_size=[800,600]):
 
-    plotter = pv.Plotter(lighting=None)
+    plotter = pv.Plotter(lighting=None, window_size=window_size)
 
     ### Load DEM
     dem_mesh = load_lunar_dem(dem_path)
@@ -391,7 +393,7 @@ def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
     # print(np.rad2deg(libra_lat), "N")
     # print(np.rad2deg(libra_lon), "E")
 
-    moon_view_dir *= earth_moon_distance
+    moon_view_dir *= earth_moon_distance   # 8e6
 
     ### To check 
     # print("Distance")
@@ -573,7 +575,7 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     # plotter.export_html("moon_view.html")
     # plotter.show(screenshot='./moon_view.png')  
     plotter.screenshot('./moon_view.png')
-    plotter.close()
+    # plotter.close()
     return(plotter)
 
 
@@ -613,8 +615,8 @@ if __name__ == '__main__':
     plotter = make_3d_image()
     update_scene(plotter, mi, start_date, lat_obs, current)
     plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")
-    # plotter.screenshot('moon_view.png')  
+    plotter.export_html("moon_view.html")
+    plotter.screenshot('moon_view.png')  
 
     ### Option 2: Live interactive animation (updates every 1 second)
     # interactive_animation(
