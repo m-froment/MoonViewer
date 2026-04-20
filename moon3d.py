@@ -12,11 +12,10 @@ from scipy import interpolate
 import time as ptime 
 import ephem
 from PIL import Image
-# import multiprocessing as mp
-# mp.set_start_method(method="fork", force=True)  # "spawn" works fine
-
 import sys
 import gc
+# import multiprocessing as mp
+# mp.set_start_method(method="fork", force=True)  # "spawn" works fine
 # Set font to Helvetica or Arial
 # matplotlib.rcParams['font.sans-serif'] = ['Helvetica', 'Arial']
 # matplotlib.rcParams['font.family'] = 'sans-serif'
@@ -298,6 +297,10 @@ def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
     # print("Distance")
     # print(earth_moon_distance/1e3)
 
+    ### To check 
+    # print("Distance")
+    # print(earth_moon_distance/1e3)
+
     ### Render the scene 
     if len(plotter.renderer.lights)>0:
         ### There is already a light, change position 
@@ -513,7 +516,7 @@ if __name__ == '__main__':
     plotter = make_3d_image()
     update_scene(plotter, mi, start_date, lat_obs, current)
     plotter.show(auto_close=False)
-    plotter.export_html("moon_view.html")
+    # plotter.export_html("moon_view.html")  ### Careful, it is very large ! 
     plotter.screenshot('moon_view.png')  
 
     ### Option 2: Live interactive animation (updates every 1 second)
@@ -550,6 +553,7 @@ if __name__ == '__main__':
     #     fps=15
     # )
 
+    ### Option 3: Save animation figures (currently commented out)
     # start_date=(2025, 1, 1, 1, 0, 0)
     # current = datetime(*start_date)
     # end_date=(2031, 12, 31, 23, 59, 59)
