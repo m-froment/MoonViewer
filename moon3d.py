@@ -51,7 +51,7 @@ def load_features():
     lc.features[id(shackleton)] = shackleton
     return(shackleton, lc)
 
-def load_lunar_dem(dem_path='moon_relief_06m_g.grd', image_path="lroc_color_16bit_srgb_4k.tif",
+def load_lunar_dem(dem_path='data/moon_relief_06m_g.grd', image_path="data/lroc_color_16bit_srgb_4k.tif",
                    scale_factor=1, res=800):
     """Load LOLA DEM and create a displaced PyVista sphere mesh.
     
@@ -188,12 +188,12 @@ def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_h
     return visibility
 
 
-def make_3d_image(dem_path='moon_relief_06m_g.grd', window_size=[800,600]):
+def make_3d_image(dem_path='data/moon_relief_06m_g.grd', window_size=[800,600]):
 
     plotter = pv.Plotter(lighting=None, window_size=window_size)
 
     ### Load DEM
-    dem_mesh=load_lunar_dem('moon_relief_06m_g.grd')
+    dem_mesh=load_lunar_dem(dem_path)
     # dem_mesh.compute_normals(cell_normals=False, inplace=True)
     # normals = dem_mesh.point_data["Normals"]
     # illumination = np.clip(np.dot(normals, sun_dir), 0.0, 1.0)
@@ -224,13 +224,16 @@ def make_3d_image(dem_path='moon_relief_06m_g.grd', window_size=[800,600]):
             'fmt':'% .4g',
         },
         # smooth_shading=True,  ### Should be off otherwise relief not visible
-    )    # plotter.add_mesh(
+    )    
+    ### Display Shackleton location 
+    # plotter.add_mesh(
     #     crater_circle,
     #     color='gold',
     #     line_width=4,
     #     lighting=False,
     #     render_lines_as_tubes=True
     # )
+
     return(plotter)
 
 
@@ -326,7 +329,7 @@ def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
     ### Option two: up is according to the observer position: need Earth ecliptic. 
     # plotter.camera.up = (0.0, np.cos(np.deg2rad(lat_obs+...)), np.sin(np.deg2rad(lat_obs+...)) )
     plotter.enable_parallel_projection()
-    plotter.camera.zoom(50)
+    plotter.camera.zoom(40)
     # plotter.camera.parallel_scale *= 0.02  ### same as zoom *50 
     ### NOTE: Do not modify camera distance, but zoom instead. 
     ###       Otherwise it changes the focal.  
@@ -340,13 +343,16 @@ def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
         plotter.add_text(
             "Date UTC: {0}\nPhase: {1}".format(start_date.strftime("%Y-%m-%d %H:%M"), mi.phase_name()),
             font_size=12,
-            color="black",
+            color="grey",
             name="date_text",
         )
     # plotter.set_background('slategray', top="lightsteelblue")
-    plotter.set_background((0.059, 0.067, 0.086))  # ou toute autre couleur
+    plotter.set_background('#1A1A30', top="#362E37")
+    # plotter.set_background((0.059, 0.067, 0.086))  # ou toute autre couleur
 
-def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='moon_relief_06m_g.grd', 
+
+
+def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='data/moon_relief_06m_g.grd', 
                  output_file='../Figures/moon_animation.mp4', fps=10):
     """Create an animation of the Moon camera view over time with mesh rendered once.
     
@@ -402,7 +408,7 @@ def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='moon_relief_0
     print(f"Animation saved to: {output_file}")
 
 
-def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=6, dem_path='moon_relief_06m_g.grd', 
+def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=6, dem_path='data/moon_relief_06m_g.grd', 
                           update_interval=1.0):
     """Display live animation in an interactive window that updates in real-time.
     
@@ -471,11 +477,10 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
     mi.update(date)
     plotter.off_screen = True
-    update_scene(plotter, mi, date, lat_obs, no_text=True)
+    update_scene(plotter, mi, date, lat_obs, no_text=False)
     # plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")
-    # plotter.show(screenshot='./moon_view.png')  
-    plotter.screenshot('./moon_view.png')
+    # plotter.export_html("./Figures/moon_view.html")
+    plotter.screenshot('./moon_view.png', window_size=[400,450])
     # plotter.close()
     return(plotter)
 
@@ -516,8 +521,8 @@ if __name__ == '__main__':
     plotter = make_3d_image()
     update_scene(plotter, mi, start_date, lat_obs, current)
     plotter.show(auto_close=False)
-    # plotter.export_html("moon_view.html")  ### Careful, it is very large ! 
-    plotter.screenshot('moon_view.png')  
+    # plotter.export_html("Figures/moon_view.html")  ### Careful, it is very large ! 
+    plotter.screenshot('./moon_view.png')  
 
     ### Option 2: Live interactive animation (updates every 1 second)
     # interactive_animation(
@@ -526,7 +531,7 @@ if __name__ == '__main__':
     #     lat_obs=lat_obs, 
     #     duration_days=28,
     #     step_hours=24,  # Update every 6 hours
-    #     dem_path='moon_relief_06m_g.grd',
+    #     dem_path='data/moon_relief_06m_g.grd',
     #     update_interval=2  # Update displayed frame every 1 second
     # )
 
@@ -536,7 +541,7 @@ if __name__ == '__main__':
     #     start_date=(2026, 4, 12, 2, 0, 0),
     #     days=30,
     #     step_hours=6,
-    #     dem_path='moon_relief_06m_g.grd',
+    #     dem_path='data/moon_relief_06m_g.grd',
     #     output_file='moon_animation_30days.mp4',
     #     fps=15
     # )
@@ -548,7 +553,7 @@ if __name__ == '__main__':
     #     start_date=(2026, 4, 12, 2, 0, 0),
     #     days=30,
     #     step_hours=6,  # Frame every 6 hours
-    #     dem_path='moon_relief_06m_g.grd',
+    #     dem_path='data/moon_relief_06m_g.grd',
     #     output_file='moon_animation_30days.mp4',
     #     fps=15
     # )

@@ -89,25 +89,31 @@ with plot_tab:
             observer_lat, observer_lon = preset_locations[selected_preset] 
     
     # %%
-    colmap, colmoon = st.columns([2,1],gap="large")
+    st.header("Moon State")
+    colmap, colmoon = st.columns([2,0.83],gap="large")
     
     with colmap:
         ### Content 
-        st.header("Moon State")
         fig=plot_moonmap(datetime,[observer_lat,observer_lon])
-        st.pyplot(fig=fig,width="content",clear_figure=True)
+        st.pyplot(fig=fig,width="content",clear_figure=True, use_container_width=True)
     with colmoon:
         # st.markdown("Shows the aspect of the Moon from a specific observer.")
         ### Generate image
         plotter = moon3d.make_3d_image()
         plotter = moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
-        st.image("./moon_view.png")
+        st.image("./moon_view.png", use_container_width=True)
     
     figshack,fig2=shackleton_visibility(datetime,forecast_days,[observer_lat,observer_lon])
     st.divider()
     colshak, colplots = st.columns(2,gap="large")
     st.header("Shackleton Visibility Forecast")
-    _, col, _ = st.columns([1, 2, 1])
+    colt, col, _ = st.columns([1.5, 2, 0.6])
+    with colt: 
+        st.markdown("<br><br>" \
+                    "Shackleton is represented by the green point <span style='color: #55ff99; font-size:13px;'>&#x2B24;</span>. " \
+                    "When it is in the right section of the plot (apparent latitude > -90°), it is visible from the Earth. "\
+                    "The colored line indicates its position from 5 days before the current date, to the chosen number of days after the current date, `Days to forecast`.",
+                    text_alignment = "justify", unsafe_allow_html=True)
     with col:
         st.pyplot(figshack, clear_figure=True)
     
