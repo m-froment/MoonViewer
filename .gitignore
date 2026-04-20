@@ -1,5 +1,7 @@
 .DS_Store/
 Figures/
+moon_view.png 
+moon_view.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
