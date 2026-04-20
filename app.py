@@ -45,11 +45,13 @@ st.set_page_config(
 ### Title 
 st.title("Lunar forecast ㊊")
 
-plot_tab, doc_tab = st.tabs(["🌘 interface", "🌖 infos"])
+plot_tab, doc_tab = st.tabs(["🌘 Interface", "🌖 Infos"])
 
 with plot_tab:
     col_date, col_loc = st.columns(2, width=600)
     with st.sidebar:
+        st.header("Observation parameters")
+        st.markdown("Choose at what time and from which location the observations are performed.")
         datetime = st.datetime_input(label="Date/time (UTC)",
                     value="now",
                     format="DD/MM/YYYY",

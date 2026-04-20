@@ -618,7 +618,7 @@ def shackleton_visibility(date,forecast_days,loca):
     
     # ── Title ─────────────────────────────────────────────────────────────────────
     ax2.set_title("Shackleton observability conditions",
-                  fontsize=10, fontweight="bold", pad=8)
+                  fontsize=10, fontweight="bold", pad=25)
     
     # ── Legend — merge all axes ───────────────────────────────────────────────────
     handles, labels = [], []
@@ -632,9 +632,10 @@ def shackleton_visibility(date,forecast_days,loca):
                            linewidth=1.2, label="Moon altitude"))
     labels.append("Moon altitude")
     
-    ax2.legend(handles, labels, fontsize=7.5, framealpha=0.3,
-               facecolor=BG, edgecolor="#444466", labelcolor=FG,
-               loc="upper left", handlelength=1.4)
+    ax2.legend(handles, labels, fontsize=9, framealpha=0.3,
+               facecolor=BG, labelcolor=FG, edgecolor="none", #edgecolor="#444466"
+               handlelength=1.4,
+               loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=4)
     
     fig2.tight_layout()
         
