@@ -11,6 +11,7 @@ pyproj==3.7.2
 pyvista==0.47.2
 rasterio==1.4.4
 scipy==1.17.1
+streamlit==1.56.0
 shapely==2.1.2
 stpyvista==0.2.1
 trame==3.12.0
