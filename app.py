@@ -1,23 +1,24 @@
 """
 Moon Viewer: Shape of the Moon with date and time from an observer
+
+Marouchka Froment 
+Pierre-Yves Froissart 
+2026
+
 """
+
 import streamlit as st
-
-### To use stpyvista
-# import multiprocessing as mp
-# mp.set_start_method("fork", force=True)
-
-# from moon3d
 import pylunar  
 import numpy as np
 import moon3d
-# from stpyvista import stpyvista
-# import pyvista as pv 
-# import multiprocessing as mp
-# mp.set_start_method(method="fork", force=True)  # "spawn" works fine
-
 from ephems import plot_moonmap,plot_moonmap2,shackleton_visibility
-import streamlit.components.v1 as components
+
+### For use of stpyvista in Community Cloud
+import os
+os.environ["VTK_USE_X"] = "OFF"
+os.environ["VTK_DEFAULT_OPENGL_WINDOW"] = "vtkOSOpenGLRenderWindow"
+from stpyvista import stpyvista
+
 
 ### Define preset observer locations
 preset_locations = {
@@ -45,7 +46,7 @@ st.set_page_config(
 ### Title 
 st.title("Lunar forecast ㊊")
 
-plot_tab, doc_tab = st.tabs(["🌘 Interface", "🌖 Infos"])
+plot_tab, moon_tab, doc_tab = st.tabs(["🌘 Interface", "🌖 3D Moon", "🌜 Infos"])
 
 with plot_tab:
     col_date, col_loc = st.columns(2, width=600)
@@ -97,13 +98,13 @@ with plot_tab:
     with colmap:
         ### Content 
         fig=plot_moonmap(datetime,[observer_lat,observer_lon])
-        st.pyplot(fig=fig,width="content",clear_figure=True, use_container_width=True)
+        st.pyplot(fig=fig,clear_figure=True, width="stretch")
     with colmoon:
         # st.markdown("Shows the aspect of the Moon from a specific observer.")
         ### Generate image
         plotter = moon3d.make_3d_image()
         plotter = moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
-        st.image("./moon_view.png", use_container_width=True)
+        st.image("./moon_view.png", width="stretch")
     
     figshack,fig2=shackleton_visibility(datetime,forecast_days,[observer_lat,observer_lon])
     st.divider()
@@ -122,19 +123,30 @@ with plot_tab:
     
     # with colplots:
     st.pyplot(fig2,width="content",clear_figure=True)
-    # st.markdown("Interactive 3D window (scroll to zoom, click to rotate, shift+click to pan)")
-    # # st.iframe("moon_view.html", height=600, width=800)
+    
+with moon_tab:
+    ### Attempt at using stpyvista to render vtk window in streamlit
+    ### Unfortunately, the camera zoom stil doesn't work 
+    st.header("3D Moon")
+    st.markdown("Press this button to generate an interactive 3D image of the Moon. The rendering will take a few seconds."\
+                "<br>"\
+                "Note that it is not possible to generate a parallel projection, so a parallax effect is present."\
+                "<br>"\
+                "`scroll` to zoom, `click` to rotate, `shift + click` to pan.", unsafe_allow_html=True)
+
+    import multiprocessing as mp
+    mp.set_start_method(method="fork", force=True)  # "spawn" works fine
+    
+    #### Render only when the user requests it to save computation time
+    if st.button("Render Moon"):
+        plotter = moon3d.get_scene_3d(plotter, observer_lat, observer_lon, datetime)
+        with st.spinner("Rendering...", show_time=True):
+            stpyvista(plotter, width=800)
+    # st.iframe("moon_view.html", height=600, width=800)
     
 st.text("ⓒ 2026 - Marouchka Froment & Pierre-Yves Froissart \n Institut de Physique du Globe de Paris",text_alignment="center",width="stretch")
     
-    # with open("moon_view.html", "r") as f:
-    #     html_content = f.read()
     
-    # components.html(html_content, height=600, scrolling=False)
-    
-    
-    # ## Attempt at using stpyvista to render vtk window in streamlit
-    # ## Unfortunately, the camera zoom stil doesn't work 
-    # from stpyvista import stpyvista
-    # stpyvista(plotter, width=800, horizontal_align='left')
+
+
 

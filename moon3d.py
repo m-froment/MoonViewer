@@ -226,6 +226,7 @@ def make_3d_image(dem_path='data/moon_relief_06m_g.grd', window_size=[800,600]):
         # smooth_shading=True,  ### Should be off otherwise relief not visible
     )    
     ### Display Shackleton location 
+    ### TODO: put back a circle. 
     # plotter.add_mesh(
     #     crater_circle,
     #     color='gold',
@@ -237,7 +238,7 @@ def make_3d_image(dem_path='data/moon_relief_06m_g.grd', window_size=[800,600]):
     return(plotter)
 
 
-def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
+def update_scene(plotter, mi, start_date, lat_obs, interactive=False):
     ### lunar illumination
     ### subsolar_lat: the latitude facing the sun. 
     ### Selenographic colongitude: the longitude of morning terminator
@@ -322,21 +323,27 @@ def update_scene(plotter, mi, start_date, lat_obs, no_text=False):
         plotter.add_light(light)
 
     ### camera at the Moon from the Earth-facing direction
-    plotter.camera.position = moon_view_dir
-    ### Try for an infinite focal (telescope)
-    # plotter.camera.focal_point = -moon_view_dir*1e10 #(0.0, 0.0, 0.0)
-    plotter.camera.up = (0.0, 0.0, 1.0)
-    ### Option two: up is according to the observer position: need Earth ecliptic. 
-    # plotter.camera.up = (0.0, np.cos(np.deg2rad(lat_obs+...)), np.sin(np.deg2rad(lat_obs+...)) )
-    plotter.enable_parallel_projection()
-    plotter.camera.zoom(40)
-    # plotter.camera.parallel_scale *= 0.02  ### same as zoom *50 
-    ### NOTE: Do not modify camera distance, but zoom instead. 
-    ###       Otherwise it changes the focal.  
-    ### enable parallel projection can also help remove perspective
+    if not interactive:
+        plotter.camera.position = moon_view_dir
+        ### Try for an infinite focal (telescope)
+        # plotter.camera.focal_point = -moon_view_dir*1e10 #(0.0, 0.0, 0.0)
+        plotter.camera.up = (0.0, 0.0, 1.0)
+        ### Option two: up is according to the observer position: need Earth ecliptic. 
+        # plotter.camera.up = (0.0, np.cos(np.deg2rad(lat_obs+...)), np.sin(np.deg2rad(lat_obs+...)) )
+        plotter.enable_parallel_projection()
+        plotter.camera.zoom(40)
+        # plotter.camera.parallel_scale *= 0.02  ### same as zoom *50 
+        ### NOTE: Do not modify camera distance, but zoom instead. 
+        ###       Otherwise it changes the focal.  
+        ### enable parallel projection can also help remove perspective
+    else: 
+        ### Put camera much closer for interactive view
+        plotter.camera.position = moon_view_dir / 50
+        plotter.camera.up = (0.0, 0.0, 1.0)
+        plotter.enable_parallel_projection()   ### Doesn't work 
 
     ### Only add text if not in streamlit 
-    if not no_text:
+    if not interactive:
         if "date_text" in plotter.actors:
             plotter.remove_actor(plotter.actors["date_text"])
         
@@ -429,43 +436,43 @@ def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=
     else:
         current = start_date
     
-    # Create plotter with mesh (only once)
+    ### Create plotter with mesh (only once)
     print("Creating interactive scene...")
     plotter = make_3d_image(dem_path=dem_path)
     
-    # Calculate total updates
+    ### Calculate total updates
     total_updates = int(duration_days * 24 / step_hours)
     
-    # Keep updating while window is still open
+    ### Keep updating while window is still open
     update_count = 0
     try:
         while update_count < total_updates:
-            # Check if window is still open
+            ### Check if window is still open
             # if not plotter.iren or plotter.iren.GetRenderWindow().GetNeverRendered():
             #     break
             
-            # Update MoonInfo
+            ### Update MoonInfo
             mi.update((current.year, current.month, current.day,
                        current.hour, current.minute, current.second))
             
-            # Update scene (this removes old text and adds new one)
+            ### Update scene (this removes old text and adds new one)
             plotter.remove_actor('text')
             update_scene(plotter, mi, current, lat_obs)
             if update_count ==0 :
                 print("Opening window... (Press Ctrl+C in terminal to stop)")
                 plotter.show(auto_close=False, full_screen=False)
             
-            # Render the scene
+            ### Render the scene
             plotter.render()
             
-            # Progress
+            ### Progress
             print(f"  Frame {update_count + 1}/{total_updates}: {current.strftime('%Y-%m-%d %H:%M')}")
             
-            # Increment time
+            ### Increment time
             current += timedelta(hours=step_hours)
             update_count += 1
             
-            # Wait before next update
+            ### Wait before next update
             time.sleep(update_interval)
             
     except KeyboardInterrupt:
@@ -477,13 +484,19 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
     mi.update(date)
     plotter.off_screen = True
-    update_scene(plotter, mi, date, lat_obs, no_text=False)
+    update_scene(plotter, mi, date, lat_obs)
     # plotter.show(auto_close=False)
     # plotter.export_html("./Figures/moon_view.html")
     plotter.screenshot('./moon_view.png', window_size=[400,450])
     # plotter.close()
     return(plotter)
 
+def get_scene_3d(plotter, observer_lat, observer_lon, date):
+    lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
+    mi = pylunar.MoonInfo(observer_lat, observer_lon)
+    mi.update(date)
+    update_scene(plotter, mi, date, lat_obs, interactive=True)
+    return(plotter)
 
 ##################################################################################
 if __name__ == '__main__':
