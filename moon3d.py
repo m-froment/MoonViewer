@@ -505,19 +505,21 @@ def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=
 ### =======================================================================================================
 ### Saves a png of the Moon scene at a specific time, to be displayed on Streamlit 
 ### =======================================================================================================
-def get_scene_png(plotter, observer_lat, observer_lon, date):
+@st.cache_data
+def get_scene_png(_plotter, observer_lat, observer_lon, date):
     lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
     mi.update(date)
-    plotter.off_screen = True
-    update_scene(plotter, mi, date, lat_obs)
+    _plotter.off_screen = True
+    update_scene(_plotter, mi, date, lat_obs)
     # plotter.screenshot('./moon_view.png', window_size=[400,450])      ### Writes to disk
-    img = plotter.screenshot(return_img = True, window_size=[400,450])  ### Avoids writing to disk
+    img = _plotter.screenshot(return_img = True, window_size=[400,450])  ### Avoids writing to disk
     return(img)
 
 ### =======================================================================================================
 ### Produces a 3d image of the Moon at current time, to be displayed interactively by Streamlit
 ### =======================================================================================================
+@st.cache_resource
 def get_scene_3d(plotter, observer_lat, observer_lon, date):
     lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)

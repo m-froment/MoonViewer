@@ -411,6 +411,7 @@ def plot_moonmap(date,loca,dpi=150):
 ### =======================================================================================================
 ### Creates table from observation windows
 ### =======================================================================================================
+@st.cache_data
 def extract_time_windows(cnum, condition):
     """
     Parameters
@@ -460,6 +461,7 @@ def extract_time_windows(cnum, condition):
 ### =======================================================================================================
 ### Predicts visibility of Shackleton on visible face.
 ### =======================================================================================================
+@st.cache_resource
 def shackleton_visibility(date,forecast_days,loca):
     LAT_SHA = -89.67
     LON_SHA = 129.78
