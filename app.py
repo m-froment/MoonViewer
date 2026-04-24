@@ -156,6 +156,7 @@ with moon_tab:
     
     #### Render only when the user requests it to save computation time
     if st.button("Render Moon"):
+        plotter = moon3d.make_3d_image()
         plotter = moon3d.get_scene_3d(plotter, observer_lat, observer_lon, datetime)
         with st.spinner("Rendering...", show_time=True):
             stpyvista(plotter, width=800)

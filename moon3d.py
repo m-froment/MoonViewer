@@ -520,12 +520,12 @@ def get_scene_png(_plotter, observer_lat, observer_lon, date):
 ### Produces a 3d image of the Moon at current time, to be displayed interactively by Streamlit
 ### =======================================================================================================
 @st.cache_resource
-def get_scene_3d(plotter, observer_lat, observer_lon, date):
+def get_scene_3d(_plotter, observer_lat, observer_lon, date):
     lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
     mi.update(date)
-    update_scene(plotter, mi, date, lat_obs, interactive=True)
-    return(plotter)
+    update_scene(_plotter, mi, date, lat_obs, interactive=True)
+    return(_plotter)
 
 
 
