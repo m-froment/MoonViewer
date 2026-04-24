@@ -53,6 +53,12 @@ with st.sidebar:
                 format="DD/MM/YYYY",
                 width=220)
     
+    ### Store last datetime used for fig1
+    if "fig1_datetime" not in st.session_state:
+        st.session_state.fig1_datetime = None
+        st.session_state.fig1 = None
+        st.session_state.img = None
+
     selected_preset = st.selectbox(
         "Select observer location:",
         options=list(preset_locations.keys()),
@@ -91,19 +97,22 @@ with st.sidebar:
 with plot_tab:
     ### Plot position and appearance of the Moon ===========================================================
     st.header("Moon State")  
-
-    colmap, colmoon = st.columns([2,0.83],gap="large")
-
-    with colmap:
+    if st.session_state.fig1_datetime != datetime:
         ### Content 
-        fig=plot_moonmap(datetime,[observer_lat,observer_lon])
-        st.pyplot(fig=fig, clear_figure=True, width="stretch")
-    with colmoon:
-        # st.markdown("Shows the aspect of the Moon from a specific observer.")
+        st.session_state.fig1 = plot_moonmap(datetime,[observer_lat,observer_lon])
+    
         ### Generate image  
         plotter = moon3d.make_3d_image()
-        img = moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
-        st.image(img, width="stretch")
+        st.session_state.img = moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
+    
+        ### Store new datetime
+        st.session_state.fig1_datetime = datetime
+    
+    colmap, colmoon = st.columns([2,0.83],gap="large")
+    with colmap:
+        st.pyplot(fig=st.session_state.fig1, clear_figure=False, width="stretch")
+    with colmoon:
+        st.image(st.session_state.img, width="stretch")
     
     st.divider()
     ### Plots specific to Shackleton  ====================================================================
