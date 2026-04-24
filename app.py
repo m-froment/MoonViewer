@@ -127,7 +127,7 @@ with plot_tab:
     st.pyplot(fig2,width="content",clear_figure=True)
     ### Plot table 
     st.subheader("Time windows for optimal observation: ")
-    st.dataframe(df_conditions, use_container_width=True)
+    st.dataframe(df_conditions, width="stretch")
     
 
 
