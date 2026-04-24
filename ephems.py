@@ -7,6 +7,7 @@ Requires: cartopy, matplotlib, numpy, ephem
 """
 
 import numpy as np
+import pandas as pd 
 import streamlit as st     
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -406,6 +407,56 @@ def plot_moonmap(date,loca,dpi=150):
     return fig
 
 
+
+### =======================================================================================================
+### Creates table from observation windows
+### =======================================================================================================
+def extract_time_windows(cnum, condition):
+    """
+    Parameters
+    ----------
+    cnum : array-like
+        Matplotlib numeric dates (same length as condition)
+    condition : array-like of bool
+        Boolean mask
+
+    Returns
+    -------
+    DataFrame with columns:
+        Start date, End date, Duration (hours)
+    """
+    cnum = np.asarray(cnum)
+    condition = np.asarray(condition, dtype=bool)
+
+    # Find transitions False -> True and True -> False
+    padded = np.concatenate([[False], condition, [False]])
+    changes = np.diff(padded.astype(int))
+
+    starts_idx = np.where(changes == 1)[0]
+    ends_idx = np.where(changes == -1)[0] - 1
+
+    rows = []
+
+    for i_start, i_end in zip(starts_idx, ends_idx):
+        start_num = cnum[i_start]
+        end_num = cnum[i_end]
+
+        start_dt = mdates.num2date(start_num)
+        end_dt = mdates.num2date(end_num)
+
+        duration_hours = (end_num - start_num) * 24.0 
+        duration_minutes = duration_hours * 60
+
+        if duration_minutes> 0:
+            rows.append({
+                "Start date": start_dt.strftime("%d %B %Y %H:%M"),
+                "End date": end_dt.strftime("%d %B %Y %H:%M"),
+                "Duration (minutes)": round(duration_minutes, 2),
+            })
+
+    return pd.DataFrame(rows)
+
+
 ### =======================================================================================================
 ### Predicts visibility of Shackleton on visible face.
 ### =======================================================================================================
@@ -547,6 +598,11 @@ def shackleton_visibility(date,forecast_days,loca):
     
     ax.set_aspect('equal')
     
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # Panel 2 — Best visibility plot 
+    # ════════════════════════════════════════════════════════════════════════════
+
     fig2, ax2 = plt.subplots(1, 1, figsize=(13, 6), facecolor=(0.055, 0.067, 0.09))
     _style_ax(ax2)
     
@@ -562,6 +618,9 @@ def shackleton_visibility(date,forecast_days,loca):
     
     # ── Green condition shading ───────────────────────────────────────────────────
     condition = isnight & shavisible & moon_visible
+    ### Store good condition times 
+    df_conditions = extract_time_windows(cnum[240:], condition[240:])
+
     ax2.fill_between(
         cnum[240:], 0, 1,
         where=condition[240:],
@@ -675,7 +734,7 @@ def shackleton_visibility(date,forecast_days,loca):
     # leg = ax.legend(fontsize=7.5, framealpha=0.3, facecolor=BG,
     #                     edgecolor="#444466", labelcolor=FG, loc="upper right",
                         # handlelength=1.2)
-    return fig,fig2
+    return fig,fig2, df_conditions
 
 # def best_observation_time(loc,date):
     

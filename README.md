@@ -6,6 +6,10 @@ To run it, write:
 ```
 streamlit run app.py
 ```
+<br>
+Or simply go to: 
+<br>
+https://moon-viewer.streamlit.app/
 
 Developpers (2026):
 - Marouchka Froment 
