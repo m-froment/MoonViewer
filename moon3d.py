@@ -202,7 +202,7 @@ def load_lunar_dem(dem_path='data/moon_relief_06m_g.grd', image_path="data/lroc_
 ### =======================================================================================================
 ### Build 3D model of the Moon (heavy object)
 ### =======================================================================================================
-@st.cache_data
+@st.cache_resource
 def make_3d_image(dem_path='data/moon_relief_06m_g.grd', window_size=[800,600]):
 
     plotter = pv.Plotter(lighting=None, window_size=window_size)
@@ -511,11 +511,9 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     mi.update(date)
     plotter.off_screen = True
     update_scene(plotter, mi, date, lat_obs)
-    # plotter.show(auto_close=False)
-    # plotter.export_html("./Figures/moon_view.html")
-    plotter.screenshot('./moon_view.png', window_size=[400,450])
-    # plotter.close()
-    return(plotter)
+    # plotter.screenshot('./moon_view.png', window_size=[400,450])      ### Writes to disk
+    img = plotter.screenshot(return_img = True, window_size=[400,450])  ### Avoids writing to disk
+    return(img)
 
 ### =======================================================================================================
 ### Produces a 3d image of the Moon at current time, to be displayed interactively by Streamlit

@@ -10,7 +10,7 @@ Pierre-Yves Froissart
 import streamlit as st  
 import numpy as np
 import moon3d
-from ephems import plot_moonmap,plot_moonmap2,shackleton_visibility
+from ephems import plot_moonmap,plot_moonmap2,shackleton_visibility, create_Earthmap
 
 ### For use of stpyvista in Community Cloud
 import os
@@ -92,13 +92,13 @@ with plot_tab:
     with colmap:
         ### Content 
         fig=plot_moonmap(datetime,[observer_lat,observer_lon])
-        st.pyplot(fig=fig,clear_figure=True, width="stretch")
+        st.pyplot(fig=fig, clear_figure=True, width="stretch")
     with colmoon:
         # st.markdown("Shows the aspect of the Moon from a specific observer.")
-        ### Generate image
+        ### Generate image  
         plotter = moon3d.make_3d_image()
-        plotter = moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
-        st.image("./moon_view.png", width="stretch")
+        img = moon3d.get_scene_png(plotter, observer_lat, observer_lon, datetime)
+        st.image(img, width="stretch")
     
     figshack,fig2=shackleton_visibility(datetime,forecast_days,[observer_lat,observer_lon])
     st.divider()

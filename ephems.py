@@ -7,6 +7,7 @@ Requires: cartopy, matplotlib, numpy, ephem
 """
 
 import numpy as np
+import streamlit as st     
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
@@ -19,6 +20,8 @@ import ephem
 import xarray as xr
 import matplotlib.dates as mdates
 from matplotlib.collections import LineCollection
+from matplotlib.image import imread
+from matplotlib.lines import Line2D
 
 from astropy.coordinates import (
     EarthLocation, AltAz, get_body, solar_system_ephemeris,
@@ -46,6 +49,7 @@ def _style_ax(ax):
     ax.title.set_color(FG)
     ax.grid(True, color=GRID_COL, alpha=ALPHA_GRID, linewidth=0.4, linestyle="--")
     
+
 def _compute_grid_astropy(lons: np.ndarray, lats: np.ndarray,
                            date, ephemeris: str = "de432s"):
     """
@@ -116,8 +120,70 @@ def _compute_grid_astropy(lons: np.ndarray, lats: np.ndarray,
         },
     )
 
+### =======================================================================================================
+### Creates Earth map and caches it. 
+### =======================================================================================================
+def create_Earthmap():
 
-def plot_moonmap2(date, loca, dpi=150, ephemeris="de432s", space_grid=1):
+        # ── Figure / axes ─────────────────────────────────────────────────────────
+    fig = plt.figure(figsize=(12, 6), facecolor=(0.055, 0.067, 0.09))
+    ax  = fig.add_axes([0.03, 0.06, 0.84, 0.88],
+                       projection=ccrs.PlateCarree())
+    ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
+    ax.set_facecolor("#0a0a1a")
+
+    # 1. Blue Marble background
+    # ax.stock_img()
+    fname = './data/NE1_50M_SR_W_low.tif'
+    ax.imshow(imread(fname), origin='upper', transform=ccrs.PlateCarree(), extent=[-180, 180, -90, 90])
+
+
+    # 2. Geographic features
+    ax.add_feature(cfeature.COASTLINE,
+                   linewidth=0.5, edgecolor="white", alpha=0.6, zorder=4)
+    ax.add_feature(cfeature.BORDERS,
+                   linewidth=0.25, edgecolor="white", alpha=0.3,
+                   linestyle=":", zorder=4)
+
+    # 3. Gridlines
+    gl = ax.gridlines(
+        crs=ccrs.PlateCarree(), draw_labels=True,
+        linewidth=0.35, color="white", alpha=0.25, linestyle="--",
+        zorder=5,
+    )
+    gl.top_labels   = False
+    gl.right_labels = False
+    gl.xlocator   = mticker.FixedLocator(range(-180, 181, 60))
+    gl.ylocator   = mticker.FixedLocator(range(-90,   91, 30))
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    gl.xlabel_style = {"size": 7, "color": "white", "alpha": 0.8}
+    gl.ylabel_style = {"size": 7, "color": "white", "alpha": 0.8}
+
+    # ── Night shading colormap ────────────────────────────────────────────────────
+    # Transparent in the day, opaque dark-blue at full night.
+    # Using a custom LinearSegmentedColormap so alpha varies with value.
+    night_colors = [
+        (0.05, 0.05, 0.20, 0.0),   # sun just below horizon → twilight, transparent
+        (0.05, 0.05, 0.20, 0.25),  # civil twilight
+        (0.02, 0.02, 0.15, 0.55),  # nautical twilight
+        (0.00, 0.00, 0.10, 0.80),  # astronomical night
+    ]
+    cmap_night = mcolors.LinearSegmentedColormap.from_list(
+        "night_alpha", night_colors, N=256
+    )
+
+    # ── Moon altitude colormap & norm ─────────────────────────────────────────────
+    cmap_moon = plt.cm.plasma
+    norm_moon  = mcolors.Normalize(vmin=5, vmax=90)
+
+    return(fig, ax, cmap_moon, norm_moon, cmap_night)
+
+
+### =======================================================================================================
+### Adds Night overlay and Moon altitude to map using astropy (slower)
+### =======================================================================================================
+def plot_moonmap2(date, loca, dpi=300, ephemeris="de432s", space_grid=1):
     """
     Parameters
     ----------
@@ -136,19 +202,6 @@ def plot_moonmap2(date, loca, dpi=150, ephemeris="de432s", space_grid=1):
         abs(loca[1][0]) + loca[1][1]/60 + loca[1][2]/3600
     )
 
-    # ── Colormaps ─────────────────────────────────────────────────────────────
-    night_colors = [
-        (0.05, 0.05, 0.20, 0.0),
-        (0.05, 0.05, 0.20, 0.25),
-        (0.02, 0.02, 0.15, 0.55),
-        (0.00, 0.00, 0.10, 0.80),
-    ]
-    cmap_night = mcolors.LinearSegmentedColormap.from_list(
-        "night_alpha", night_colors, N=256
-    )
-    cmap_moon = plt.cm.plasma
-    norm_moon  = mcolors.Normalize(vmin=5, vmax=90)
-
     # ── Grid & computation ────────────────────────────────────────────────────
     lons = np.arange(-180, 180, space_grid)
     lats = np.arange( -90,  90, space_grid)
@@ -164,16 +217,9 @@ def plot_moonmap2(date, loca, dpi=150, ephemeris="de432s", space_grid=1):
     dist_km = dist_au * 149_597_870.7
 
     # ── Figure / axes ─────────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(12, 6), facecolor=(0.055, 0.067, 0.09))
-    ax  = fig.add_axes([0.03, 0.06, 0.84, 0.88],
-                       projection=ccrs.PlateCarree())
-    ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
-    ax.set_facecolor("#0a0a1a")
+    fig, ax, cmap_moon, norm_moon, cmap_night = create_Earthmap()
 
-    # 1. Blue Marble background
-    ax.stock_img()
-
-    # 2. Night overlay
+    # 1. Night overlay
     ax.pcolormesh(
         ds["lon"].values, ds["lat"].values, night_float,
         cmap=cmap_night, vmin=0, vmax=1,
@@ -181,7 +227,7 @@ def plot_moonmap2(date, loca, dpi=150, ephemeris="de432s", space_grid=1):
         zorder=2, rasterized=True,
     )
 
-    # 3. Moon altitude overlay
+    # 2. Moon altitude overlay
     pm = ax.pcolormesh(
         ds["lon"].values, ds["lat"].values, moon_alta,
         cmap=cmap_moon, norm=norm_moon,
@@ -190,36 +236,14 @@ def plot_moonmap2(date, loca, dpi=150, ephemeris="de432s", space_grid=1):
         zorder=3, rasterized=True,
     )
 
-    # 4. Observer position
+    # 3. Observer position
     ax.scatter(
         observer_lon, observer_lat,
         s=20, c="red", alpha=0.7,
         transform=ccrs.PlateCarree(), zorder=10,
     )
 
-    # 5. Geographic features
-    ax.add_feature(cfeature.COASTLINE,
-                   linewidth=0.5, edgecolor="white", alpha=0.6, zorder=4)
-    ax.add_feature(cfeature.BORDERS,
-                   linewidth=0.25, edgecolor="white", alpha=0.3,
-                   linestyle=":", zorder=4)
-
-    # 6. Gridlines
-    gl = ax.gridlines(
-        crs=ccrs.PlateCarree(), draw_labels=True,
-        linewidth=0.35, color="white", alpha=0.25, linestyle="--",
-        zorder=5,
-    )
-    gl.top_labels   = False
-    gl.right_labels = False
-    gl.xlocator   = mticker.FixedLocator(range(-180, 181, 60))
-    gl.ylocator   = mticker.FixedLocator(range(-90,   91, 30))
-    gl.xformatter = LONGITUDE_FORMATTER
-    gl.yformatter = LATITUDE_FORMATTER
-    gl.xlabel_style = {"size": 7, "color": "white", "alpha": 0.8}
-    gl.ylabel_style = {"size": 7, "color": "white", "alpha": 0.8}
-
-    # 7. Colorbar
+    # 4. Colorbar
     cax = fig.add_axes([0.89, 0.10, 0.016, 0.80])
     cb  = fig.colorbar(pm, cax=cax, orientation="vertical", extend="neither")
     cb.set_label("Moon altitude (°)", fontsize=12, color="white", labelpad=6)
@@ -235,7 +259,7 @@ def plot_moonmap2(date, loca, dpi=150, ephemeris="de432s", space_grid=1):
     fig.text(0.04, 0.01, meta,
              fontsize=10, color="#cccccc", style="italic", va="bottom")
 
-    # 9. Legend
+    # 5. Legend
     night_patch = mpatches.Patch(
         facecolor=(0.0, 0.0, 0.1), alpha=0.7,
         label="Night (sun < 0°)",
@@ -251,30 +275,14 @@ def plot_moonmap2(date, loca, dpi=150, ephemeris="de432s", space_grid=1):
     return fig
 
 
-
-
+### =======================================================================================================
+### Adds Night overlay and Moon altitude to map.
+### =======================================================================================================
 def plot_moonmap(date,loca,dpi=150):
     space_grid=1
     
     observer_lat = np.sign(loca[0][0]) * (abs(loca[0][0]) + loca[0][1]/60 + loca[0][2]/3600)
     observer_lon = np.sign(loca[1][0]) * (abs(loca[1][0]) + loca[1][1]/60 + loca[1][2]/3600)
-    
-    # ── Night shading colormap ────────────────────────────────────────────────────
-    # Transparent in the day, opaque dark-blue at full night.
-    # Using a custom LinearSegmentedColormap so alpha varies with value.
-    night_colors = [
-        (0.05, 0.05, 0.20, 0.0),   # sun just below horizon → twilight, transparent
-        (0.05, 0.05, 0.20, 0.25),  # civil twilight
-        (0.02, 0.02, 0.15, 0.55),  # nautical twilight
-        (0.00, 0.00, 0.10, 0.80),  # astronomical night
-    ]
-    cmap_night = mcolors.LinearSegmentedColormap.from_list(
-        "night_alpha", night_colors, N=256
-    )
-
-    # ── Moon altitude colormap & norm ─────────────────────────────────────────────
-    cmap_moon = plt.cm.plasma
-    norm_moon  = mcolors.Normalize(vmin=5, vmax=90)
         
     lons=np.arange(-180,180,space_grid)
     lats=np.arange(-90,90,space_grid)
@@ -333,14 +341,7 @@ def plot_moonmap(date,loca,dpi=150):
     dist_km = dist_au * 149_597_870.7
 
     # ── Figure / axes ─────────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(12, 6), facecolor=(0.055, 0.067, 0.09))
-    # Main map axes
-    ax = fig.add_axes([0.03, 0.06, 0.84, 0.88],
-                      projection=ccrs.PlateCarree())
-    ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
-    ax.set_facecolor("#0a0a1a")   # deep-space fallback color
-
-    ax.stock_img()
+    fig, ax, cmap_moon, norm_moon, cmap_night = create_Earthmap()
 
     # ── 2. Night overlay ──────────────────────────────────────────────────────
     # The colormap maps 0→transparent, 1→deep-navy-opaque, so day areas
@@ -365,28 +366,6 @@ def plot_moonmap(date,loca,dpi=150):
     ax.scatter(observer_lon, observer_lat, s=20, c="red",alpha=0.7,
            transform=ccrs.PlateCarree(),
            zorder=10)
-    
-    # ── 4. Geographic features (drawn on top of overlays) ─────────────────────
-    ax.add_feature(cfeature.COASTLINE,
-                   linewidth=0.5, edgecolor="white", alpha=0.6, zorder=4)
-    ax.add_feature(cfeature.BORDERS,
-                   linewidth=0.25, edgecolor="white", alpha=0.3,
-                   linestyle=":", zorder=4)
-
-    # ── 5. Gridlines ──────────────────────────────────────────────────────────
-    gl = ax.gridlines(
-        crs=ccrs.PlateCarree(), draw_labels=True,
-        linewidth=0.35, color="white", alpha=0.25, linestyle="--",
-        zorder=5,
-    )
-    gl.top_labels   = False
-    gl.right_labels = False
-    gl.xlocator   = mticker.FixedLocator(range(-180, 181, 60))
-    gl.ylocator   = mticker.FixedLocator(range(-90,   91, 30))
-    gl.xformatter = LONGITUDE_FORMATTER
-    gl.yformatter = LATITUDE_FORMATTER
-    gl.xlabel_style = {"size": 7, "color": "white", "alpha": 0.8}
-    gl.ylabel_style = {"size": 7, "color": "white", "alpha": 0.8}
 
     # ── 6. Colorbar ───────────────────────────────────────────────────────────
     cax = fig.add_axes([0.89, 0.10, 0.016, 0.80])
@@ -427,6 +406,9 @@ def plot_moonmap(date,loca,dpi=150):
     return fig
 
 
+### =======================================================================================================
+### Predicts visibility of Shackleton on visible face.
+### =======================================================================================================
 def shackleton_visibility(date,forecast_days,loca):
     LAT_SHA = -89.67
     LON_SHA = 129.78
@@ -627,7 +609,6 @@ def shackleton_visibility(date,forecast_days,loca):
         handles += h; labels += l
     
     # Add a proxy for the moon altitude gradient line
-    from matplotlib.lines import Line2D
     handles.append(Line2D([0], [0], color=plt.cm.get_cmap(CMAP)(0.6),
                            linewidth=1.2, label="Moon altitude"))
     labels.append("Moon altitude")
