@@ -14,6 +14,7 @@ import ephem
 from PIL import Image
 import sys
 import gc
+import streamlit as st 
 # import multiprocessing as mp
 # mp.set_start_method(method="fork", force=True)  # "spawn" works fine
 # Set font to Helvetica or Arial
@@ -23,8 +24,10 @@ pv.OFF_SCREEN = True
 pv.global_theme.font.family = 'courier'
 pv.global_theme.font.size = 12
 
-
-
+### =======================================================================================================
+### Adds Shackleton to pylunar's set of features. 
+### =======================================================================================================
+@st.cache_data
 def load_features():
     ### Total of all features available in pylunar 
     lc = pylunar.LunarFeatureContainer("Lunar")
@@ -51,6 +54,73 @@ def load_features():
     lc.features[id(shackleton)] = shackleton
     return(shackleton, lc)
 
+
+### =======================================================================================================
+### Tests some calculations of pylunar
+### =======================================================================================================
+def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_hours=1):
+    """Test Shackleton visibility for a series of dates starting at start_date.
+
+    Returns a list of 0/1 values for the next `days` days.
+    """
+
+    mi_test = pylunar.MoonInfo(observer_lat, observer_lon)
+
+    current = datetime(*start_date)
+    visibility = []
+    date_list = []
+    earth_moon_distances = []
+    libration_lat = []
+    libration_lon = []
+    subsolar_colon = []
+
+    for _ in range(int(days * 24/step_hours)):
+        mi_test.update((current.year, current.month, current.day,
+                        current.hour, current.minute, current.second))
+        visible = mi_test.is_visible(shackleton)
+        visibility.append(1 if visible else 0)
+        date_list.append(current)
+        earth_moon_distances.append(mi_test.earth_distance())
+        libration_lat.append(mi_test.libration_lat())
+        libration_lon.append(mi_test.libration_lon())
+        subsolar_colon.append(mi_test.colong())
+        current += timedelta(hours=step_hours)
+        
+    #######################################
+    fig, (ax1, ax2,ax3) = plt.subplots(3,1)
+    ax1.fill_between(date_list, visibility, linestyle="-", color="orangered", alpha=0.3)
+    ax2.plot(date_list, earth_moon_distances, c="k")
+    ax2b = ax2.twinx()
+    ax2b.plot(date_list, libration_lat, c="b", label="Lat")
+    ax2b.plot(date_list, libration_lon, c="r", label="Lon")
+    ###
+    ax1.set_title("Shackleton visibility over {} days".format(days))
+    ax2.set_xlabel("Days since {}".format(datetime(*start_date).strftime("%d/%m/%Y")))
+    ax1.set_ylabel("Visible (1) / Not visible (0)")
+    # ax.set_yticks([0, 1])
+    #ax.set_ylim(-0.1, 1.1)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
+    ax1.tick_params(axis='x', labelrotation=45)
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
+    ax2.tick_params(axis='x', labelrotation=45)
+    ax2b.legend()
+    ###
+    ax2.set_ylabel("Earth-Moon distance [km]")
+    ax2b.set_ylabel("Libration latitude/longitude [°]", color="b")
+    ###
+    ax3.plot(date_list, subsolar_colon, c="r", label="morning")
+    ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
+
+    # ax.grid(True)
+    fig.tight_layout()
+
+    return visibility
+
+
+### =======================================================================================================
+### Loads elevation model of the Moon (heavy file)
+### =======================================================================================================
+@st.cache_data
 def load_lunar_dem(dem_path='data/moon_relief_06m_g.grd', image_path="data/lroc_color_16bit_srgb_4k.tif",
                    scale_factor=1, res=800):
     """Load LOLA DEM and create a displaced PyVista sphere mesh.
@@ -129,65 +199,10 @@ def load_lunar_dem(dem_path='data/moon_relief_06m_g.grd', image_path="data/lroc_
     return sphere
 
 
-def test_visibility_time(observer_lat, observer_lon, start_date, days=60, step_hours=1):
-    """Test Shackleton visibility for a series of dates starting at start_date.
-
-    Returns a list of 0/1 values for the next `days` days.
-    """
-
-    mi_test = pylunar.MoonInfo(observer_lat, observer_lon)
-
-    current = datetime(*start_date)
-    visibility = []
-    date_list = []
-    earth_moon_distances = []
-    libration_lat = []
-    libration_lon = []
-    subsolar_colon = []
-
-    for _ in range(int(days * 24/step_hours)):
-        mi_test.update((current.year, current.month, current.day,
-                        current.hour, current.minute, current.second))
-        visible = mi_test.is_visible(shackleton)
-        visibility.append(1 if visible else 0)
-        date_list.append(current)
-        earth_moon_distances.append(mi_test.earth_distance())
-        libration_lat.append(mi_test.libration_lat())
-        libration_lon.append(mi_test.libration_lon())
-        subsolar_colon.append(mi_test.colong())
-        current += timedelta(hours=step_hours)
-        
-    #######################################
-    fig, (ax1, ax2,ax3) = plt.subplots(3,1)
-    ax1.fill_between(date_list, visibility, linestyle="-", color="orangered", alpha=0.3)
-    ax2.plot(date_list, earth_moon_distances, c="k")
-    ax2b = ax2.twinx()
-    ax2b.plot(date_list, libration_lat, c="b", label="Lat")
-    ax2b.plot(date_list, libration_lon, c="r", label="Lon")
-    ###
-    ax1.set_title("Shackleton visibility over {} days".format(days))
-    ax2.set_xlabel("Days since {}".format(datetime(*start_date).strftime("%d/%m/%Y")))
-    ax1.set_ylabel("Visible (1) / Not visible (0)")
-    # ax.set_yticks([0, 1])
-    #ax.set_ylim(-0.1, 1.1)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-    ax1.tick_params(axis='x', labelrotation=45)
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-    ax2.tick_params(axis='x', labelrotation=45)
-    ax2b.legend()
-    ###
-    ax2.set_ylabel("Earth-Moon distance [km]")
-    ax2b.set_ylabel("Libration latitude/longitude [°]", color="b")
-    ###
-    ax3.plot(date_list, subsolar_colon, c="r", label="morning")
-    ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-
-    # ax.grid(True)
-    fig.tight_layout()
-
-    return visibility
-
-
+### =======================================================================================================
+### Build 3D model of the Moon (heavy object)
+### =======================================================================================================
+@st.cache_data
 def make_3d_image(dem_path='data/moon_relief_06m_g.grd', window_size=[800,600]):
 
     plotter = pv.Plotter(lighting=None, window_size=window_size)
@@ -238,6 +253,9 @@ def make_3d_image(dem_path='data/moon_relief_06m_g.grd', window_size=[800,600]):
     return(plotter)
 
 
+### =======================================================================================================
+### Add sunlight and moves observer according to ephemerids
+### =======================================================================================================
 def update_scene(plotter, mi, start_date, lat_obs, interactive=False):
     ### lunar illumination
     ### subsolar_lat: the latitude facing the sun. 
@@ -358,7 +376,9 @@ def update_scene(plotter, mi, start_date, lat_obs, interactive=False):
     # plotter.set_background((0.059, 0.067, 0.086))  # ou toute autre couleur
 
 
-
+### =======================================================================================================
+### Test function to save an animation of the scene
+### =======================================================================================================
 def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='data/moon_relief_06m_g.grd', 
                  output_file='../Figures/moon_animation.mp4', fps=10):
     """Create an animation of the Moon camera view over time with mesh rendered once.
@@ -415,6 +435,9 @@ def animate_moon(mi, start_date, days=30, step_hours=12, dem_path='data/moon_rel
     print(f"Animation saved to: {output_file}")
 
 
+### =======================================================================================================
+### Shows the 3D Moon evolution in time in an interactive window. 
+### =======================================================================================================
 def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=6, dem_path='data/moon_relief_06m_g.grd', 
                           update_interval=1.0):
     """Display live animation in an interactive window that updates in real-time.
@@ -479,6 +502,9 @@ def interactive_animation(mi, start_date, lat_obs, duration_days=30, step_hours=
         print("Animation stopped by user")
 
 
+### =======================================================================================================
+### Saves a png of the Moon scene at a specific time, to be displayed on Streamlit 
+### =======================================================================================================
 def get_scene_png(plotter, observer_lat, observer_lon, date):
     lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
@@ -491,6 +517,9 @@ def get_scene_png(plotter, observer_lat, observer_lon, date):
     # plotter.close()
     return(plotter)
 
+### =======================================================================================================
+### Produces a 3d image of the Moon at current time, to be displayed interactively by Streamlit
+### =======================================================================================================
 def get_scene_3d(plotter, observer_lat, observer_lon, date):
     lat_obs = observer_lat[0] + observer_lat[1]/60 + observer_lat[2]/3600
     mi = pylunar.MoonInfo(observer_lat, observer_lon)
@@ -498,7 +527,11 @@ def get_scene_3d(plotter, observer_lat, observer_lon, date):
     update_scene(plotter, mi, date, lat_obs, interactive=True)
     return(plotter)
 
-##################################################################################
+
+
+### =======================================================================================================
+### Call functions for tests. 
+### =======================================================================================================
 if __name__ == '__main__':
     pv.OFF_SCREEN = False
     ### Input observer position (latitude degree-minutes-seconds), (longitude degree-minutes-seconds)

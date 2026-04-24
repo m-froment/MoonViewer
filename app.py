@@ -7,8 +7,7 @@ Pierre-Yves Froissart
 
 """
 
-import streamlit as st
-import pylunar  
+import streamlit as st  
 import numpy as np
 import moon3d
 from ephems import plot_moonmap,plot_moonmap2,shackleton_visibility
@@ -36,11 +35,6 @@ st.set_page_config(
     page_title="Visibility of the Moon",
     page_icon="🌒",
     layout="wide",
-    # initial_sidebar_state="expanded"
-    # menu_items={
-    #         "Moon View",
-    #         "About",
-    #         }
 )
 
 ### Title 
